@@ -149,7 +149,10 @@ export default function Booking() {
   const onDrawerPointerDown = (e: React.PointerEvent) => {
     drawerStartY.current = e.clientY
     drawerOffset.current = 0
-    (e.target as Element).setPointerCapture?.(e.pointerId)
+    const target = e.target as Element | null
+    if (target && typeof target.setPointerCapture === 'function') {
+      target.setPointerCapture(e.pointerId)
+    }
   }
   const onDrawerPointerMove = (e: React.PointerEvent) => {
     if (drawerStartY.current == null) return
@@ -175,7 +178,10 @@ export default function Booking() {
   const onModalPointerDown = (e: React.PointerEvent) => {
     modalStartY.current = e.clientY
     modalOffset.current = 0
-    (e.target as Element).setPointerCapture?.(e.pointerId)
+    const target = e.target as Element | null
+    if (target && typeof target.setPointerCapture === 'function') {
+      target.setPointerCapture(e.pointerId)
+    }
   }
   const onModalPointerMove = (e: React.PointerEvent) => {
     if (modalStartY.current == null) return
