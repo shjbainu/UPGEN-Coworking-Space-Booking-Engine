@@ -50,6 +50,12 @@ export default function Success() {
       return
     }
 
+    // Type guard: ensure customer.email is defined
+    const customerEmail = customer.email
+    if (!customerEmail) {
+      return
+    }
+
     const sendEmail = async () => {
       try {
         const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID
@@ -64,9 +70,9 @@ export default function Success() {
 
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-        if (!emailRegex.test(customer.email)) {
+        if (!emailRegex.test(customerEmail)) {
           // eslint-disable-next-line no-console
-          console.error('Invalid email format:', customer.email)
+          console.error('Invalid email format:', customerEmail)
           return
         }
 
@@ -86,7 +92,7 @@ export default function Success() {
         // Format template parameters for EmailJS
         // Important: EmailJS requires recipient email in template parameters
         // Try multiple variable names for compatibility
-        const recipientEmail = customer.email.trim()
+        const recipientEmail = customerEmail.trim()
         const templateParams: Record<string, string> = {
           // Try all possible recipient email variable names
           to_email: recipientEmail,
@@ -128,7 +134,7 @@ export default function Success() {
         }
 
         // eslint-disable-next-line no-console
-        console.log('Sending email to:', customer.email, 'with params:', { ...templateParams, spaces_html: '[HTML]', services_html: '[HTML]' })
+        console.log('Sending email to:', customerEmail, 'with params:', { ...templateParams, spaces_html: '[HTML]', services_html: '[HTML]' })
 
         await emailjs.send(serviceId, templateId, templateParams, publicKey)
         setEmailSent(true)
@@ -141,8 +147,8 @@ export default function Success() {
         console.error('Error details:', {
           status: error?.status,
           text: error?.text,
-          customerEmail: customer.email,
-          hasEmail: !!customer.email
+          customerEmail: customerEmail,
+          hasEmail: !!customerEmail
         })
         // Don't show error to user, just log it
       }
