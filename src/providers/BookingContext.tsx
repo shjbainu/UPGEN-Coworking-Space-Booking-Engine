@@ -28,6 +28,7 @@ type BookingState = {
   spaces: SelectedSpace[]
   services: SelectedService[]
   customer?: CustomerInfo
+  bookingId?: string
 }
 
 type BookingContextValue = BookingState & {
@@ -39,6 +40,7 @@ type BookingContextValue = BookingState & {
   setServiceQuantity: (serviceId: string, quantity: number) => void
   removeService: (serviceId: string) => void
   setCustomer: (c: CustomerInfo) => void
+  setBookingId: (id: string) => void
   clear: () => void
   totalAmount: number
   estimatedHours: number
@@ -52,6 +54,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [spaces, setSpaces] = useState<SelectedSpace[]>([])
   const [services, setServices] = useState<SelectedService[]>([])
   const [customer, setCustomer] = useState<CustomerInfo | undefined>(undefined)
+  const [bookingId, setBookingId] = useState<string | undefined>(undefined)
 
   const estimatedHours = useMemo(() => {
     const s = new Date(checkin).getTime()
@@ -94,14 +97,16 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSpaces([])
     setServices([])
     setCustomer(undefined)
+    setBookingId(undefined)
   }
 
   const value: BookingContextValue = {
-    checkin, checkout, spaces, services, customer,
+    checkin, checkout, spaces, services, customer, bookingId,
     setCheckin, setCheckout,
     addSpace, removeSpace,
     addService, setServiceQuantity, removeService,
     setCustomer,
+    setBookingId,
     clear,
     totalAmount,
     estimatedHours

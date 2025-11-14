@@ -6,7 +6,7 @@ import { useState } from 'react'
 
 export default function CustomerInfo() {
   const navigate = useNavigate()
-  const { checkin, checkout, spaces, services, totalAmount, setCustomer, clear } = useBooking()
+  const { checkin, checkout, spaces, services, totalAmount, setCustomer, setBookingId, clear } = useBooking()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -152,6 +152,9 @@ export default function CustomerInfo() {
       } else {
         bookingId = String(bookingRes.booking_id)
       }
+
+      // Save bookingId to context for email notification
+      setBookingId(bookingId)
 
       // 3) Create booking service (group) to attach service details
       let bookingServiceId: string = ''

@@ -1,10 +1,13 @@
 import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import emailjs from '@emailjs/browser'
 import MobileLayout from '@/shared/components/MobileLayout'
 import { useBooking } from '@/providers/BookingContext'
 
 export default function Success() {
   const navigate = useNavigate()
-  const { checkin, checkout, spaces, services, totalAmount, customer, clear } = useBooking()
+  const { checkin, checkout, spaces, services, totalAmount, customer, bookingId, estimatedHours, clear } = useBooking()
+  const [emailSent, setEmailSent] = useState(false)
 
   const handleGoHome = () => {
     clear()
@@ -25,6 +28,128 @@ export default function Success() {
       minute: '2-digit'
     })
   }
+
+  const formatDuration = (hours: number) => {
+    if (!hours || hours <= 0 || !Number.isFinite(hours)) return '0p'
+    const totalMinutes = Math.round(hours * 60)
+    const h = Math.floor(totalMinutes / 60)
+    const m = totalMinutes % 60
+    if (h > 0 && m > 0) return `${h}h${m}p`
+    if (h > 0) return `${h}h`
+    if (m > 0) return `${m}p`
+    return '0p'
+  }
+
+  // Send email confirmation when component mounts
+  useEffect(() => {
+    if (emailSent || !customer?.email || !bookingId) {
+      if (!customer?.email) {
+        // eslint-disable-next-line no-console
+        console.log('Email not sent: customer email is missing')
+      }
+      return
+    }
+
+    const sendEmail = async () => {
+      try {
+        const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID
+        const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID
+        const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
+
+        if (!serviceId || !templateId || !publicKey) {
+          // eslint-disable-next-line no-console
+          console.warn('EmailJS configuration missing. Please set VITE_EMAILJS_SERVICE_ID, VITE_EMAILJS_TEMPLATE_ID, and VITE_EMAILJS_PUBLIC_KEY in .env file')
+          return
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(customer.email)) {
+          // eslint-disable-next-line no-console
+          console.error('Invalid email format:', customer.email)
+          return
+        }
+
+        // Prepare email template data
+        const spaceItems = spaces.map(s => ({
+          name: `${s.spaceTypeName} • ${s.spaceId}`,
+          duration: formatDuration(estimatedHours),
+          price: (s.unitPriceHourly * estimatedHours).toLocaleString('vi-VN')
+        }))
+
+        const serviceItems = services.map(s => ({
+          name: s.serviceName,
+          quantity: s.quantity,
+          price: (s.unitPrice * s.quantity).toLocaleString('vi-VN')
+        }))
+
+        // Format template parameters for EmailJS
+        // Important: EmailJS requires recipient email in template parameters
+        // Try multiple variable names for compatibility
+        const recipientEmail = customer.email.trim()
+        const templateParams: Record<string, string> = {
+          // Try all possible recipient email variable names
+          to_email: recipientEmail,
+          email: recipientEmail,
+          user_email: recipientEmail,
+          recipient_email: recipientEmail,
+          to_name: customer.name,
+          reply_to: recipientEmail,
+          order_id: bookingId,
+          customer_name: customer.name,
+          customer_phone: customer.phone,
+          customer_email: recipientEmail,
+          checkin: formatDateTime(checkin),
+          checkout: formatDateTime(checkout),
+          spaces_html: spaceItems.map(s => 
+            `<tr style="vertical-align: top">
+              <td style="padding: 12px 8px 0 4px; width: 100%">
+                <div><strong>${s.name}</strong></div>
+                <div style="font-size: 14px; color: #888; padding-top: 4px">Thời gian: ${s.duration}</div>
+              </td>
+              <td style="padding: 12px 4px 0 0; white-space: nowrap; text-align: right">
+                <strong>${s.price}₫</strong>
+              </td>
+            </tr>`
+          ).join(''),
+          services_html: serviceItems.length > 0 ? serviceItems.map(s => 
+            `<tr style="vertical-align: top">
+              <td style="padding: 12px 8px 0 4px; width: 100%">
+                <div><strong>${s.name}</strong></div>
+                <div style="font-size: 14px; color: #888; padding-top: 4px">Số lượng: ${s.quantity}</div>
+              </td>
+              <td style="padding: 12px 4px 0 0; white-space: nowrap; text-align: right">
+                <strong>${s.price}₫</strong>
+              </td>
+            </tr>`
+          ).join('') : '<tr><td colspan="2" style="padding: 12px 8px; color: #888;">Chưa chọn dịch vụ</td></tr>',
+          total_amount: totalAmount.toLocaleString('vi-VN'),
+          website_link: import.meta.env.VITE_WEBSITE_LINK || '#'
+        }
+
+        // eslint-disable-next-line no-console
+        console.log('Sending email to:', customer.email, 'with params:', { ...templateParams, spaces_html: '[HTML]', services_html: '[HTML]' })
+
+        await emailjs.send(serviceId, templateId, templateParams, publicKey)
+        setEmailSent(true)
+        // eslint-disable-next-line no-console
+        console.log('Email sent successfully')
+      } catch (error: any) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to send email:', error)
+        // eslint-disable-next-line no-console
+        console.error('Error details:', {
+          status: error?.status,
+          text: error?.text,
+          customerEmail: customer.email,
+          hasEmail: !!customer.email
+        })
+        // Don't show error to user, just log it
+      }
+    }
+
+    sendEmail()
+  }, [customer, bookingId, spaces, services, totalAmount, checkin, checkout, estimatedHours, emailSent])
 
   return (
     <MobileLayout bottom={bottom}>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MobileLayout from '@/shared/components/MobileLayout'
 import { supabase } from '@/config/supabaseClient'
@@ -31,6 +31,7 @@ export default function Booking() {
   const [spacesAll, setSpacesAll] = useState<SpaceRow[]>([])
   const [servicesAll, setServicesAll] = useState<ServiceRow[]>([])
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerJustOpened, setDrawerJustOpened] = useState(false)
   const [selectedTypeId, setSelectedTypeId] = useState<string>('')
   const [bookingDate, setBookingDate] = useState<string>('')
   const [checkinTime, setCheckinTime] = useState<string>('09:00')
@@ -40,6 +41,7 @@ export default function Booking() {
   const [spaceModalTitle, setSpaceModalTitle] = useState('')
   const [loadingSpaces, setLoadingSpaces] = useState(false)
   const [availableSpacesByType, setAvailableSpacesByType] = useState<{ space_id: string }[]>([])
+  const [spaceModalJustOpened, setSpaceModalJustOpened] = useState(false)
   const drawerRef = useRef<HTMLDivElement>(null)
   const spaceModalRef = useRef<HTMLDivElement>(null)
   const drawerStartY = useRef<number | null>(null)
@@ -123,27 +125,47 @@ export default function Booking() {
     }
   }, [bookingDate, checkoutTime, setCheckout])
 
+  const openDrawer = useCallback(() => {
+    setDrawerTranslate(0)
+    setDrawerJustOpened(true)
+    setDrawerOpen(true)
+    // Reset animation flag after animation completes
+    setTimeout(() => setDrawerJustOpened(false), 300)
+  }, [])
+
+  const closeDrawer = useCallback(() => {
+    setDrawerTranslate(0)
+    setDrawerOpen(false)
+    setDrawerJustOpened(false)
+  }, [])
+
   useEffect(() => {
     if (!drawerOpen) return
     const handleClickOutside = (event: PointerEvent) => {
       if (drawerRef.current && !drawerRef.current.contains(event.target as Node)) {
-        setDrawerOpen(false)
+        closeDrawer()
       }
     }
     document.addEventListener('pointerdown', handleClickOutside)
     return () => document.removeEventListener('pointerdown', handleClickOutside)
-  }, [drawerOpen])
+  }, [drawerOpen, closeDrawer])
+
+  const closeSpaceModal = useCallback(() => {
+    setModalTranslate(0)
+    setSpaceModalOpen(false)
+    setSpaceModalJustOpened(false)
+  }, [])
 
   useEffect(() => {
     if (!spaceModalOpen) return
     const handleClickOutside = (event: PointerEvent) => {
       if (spaceModalRef.current && !spaceModalRef.current.contains(event.target as Node)) {
-        setSpaceModalOpen(false)
+        closeSpaceModal()
       }
     }
     document.addEventListener('pointerdown', handleClickOutside)
     return () => document.removeEventListener('pointerdown', handleClickOutside)
-  }, [spaceModalOpen])
+  }, [spaceModalOpen, closeSpaceModal])
 
   // Drag-to-close for drawer
   const onDrawerPointerDown = (e: React.PointerEvent) => {
@@ -167,8 +189,7 @@ export default function Booking() {
     drawerStartY.current = null
     drawerOffset.current = 0
     if (dy > 120) {
-      setDrawerOpen(false)
-      setDrawerTranslate(0)
+      closeDrawer()
     } else {
       setDrawerTranslate(0)
     }
@@ -196,8 +217,7 @@ export default function Booking() {
     modalStartY.current = null
     modalOffset.current = 0
     if (dy > 120) {
-      setSpaceModalOpen(false)
-      setModalTranslate(0)
+      closeSpaceModal()
     } else {
       setModalTranslate(0)
     }
@@ -216,8 +236,12 @@ export default function Booking() {
     if (!type) return
     setSelectedTypeId(typeId)
     setSpaceModalTitle(type.space_name)
+    setModalTranslate(0)
+    setSpaceModalJustOpened(true)
     setSpaceModalOpen(true)
     setLoadingSpaces(true)
+    // Reset animation flag after animation completes
+    setTimeout(() => setSpaceModalJustOpened(false), 300)
     try {
       // Compose ISO
       const checkinISO = new Date(`${bookingDate}T${checkinTime}:00`).toISOString()
@@ -287,12 +311,12 @@ export default function Booking() {
       spaceTypeName: type.space_name,
       unitPriceHourly: type.unit_price_hourly
     })
-    setSpaceModalOpen(false)
+    closeSpaceModal()
   }
 
   const bottom = (
     <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-      <button className="btn secondary" style={{ flex: 1 }} onClick={() => setDrawerOpen(true)}>
+      <button className="btn secondary" style={{ flex: 1 }} onClick={openDrawer}>
         Tổng: {totalAmount.toLocaleString('vi-VN')}đ
       </button>
       <button
@@ -396,11 +420,34 @@ export default function Booking() {
         })}
       </div>
 
+      {/* Backdrop overlay for drawer */}
+      {drawerOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 999,
+            animation: 'fadeIn 0.3s ease-out'
+          }}
+          onClick={closeDrawer}
+        />
+      )}
+
+      {/* Drawer */}
       {drawerOpen && (
         <div
           ref={drawerRef}
           className="sheet"
-          style={{ padding: 16, transform: `translateY(${drawerTranslate}px)` }}
+          style={{ 
+            padding: 16, 
+            transform: `translateY(${drawerTranslate}px)`,
+            zIndex: 1000,
+            animation: drawerJustOpened ? 'slideUp 0.3s ease-out' : 'none'
+          }}
         >
           <div
             className="sheet-handle"
@@ -429,14 +476,37 @@ export default function Booking() {
             <strong>Tổng</strong>
             <strong>{totalAmount.toLocaleString('vi-VN')}đ</strong>
           </div>
-      <button className="btn full" style={{ marginTop: 12 }} onClick={() => setDrawerOpen(false)}>Đóng</button>
+      <button className="btn full" style={{ marginTop: 12 }} onClick={closeDrawer}>Đóng</button>
         </div>
       )}
+      {/* Backdrop overlay */}
+      {spaceModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 999,
+            animation: 'fadeIn 0.3s ease-out'
+          }}
+          onClick={closeSpaceModal}
+        />
+      )}
+
+      {/* Space selection modal */}
       {spaceModalOpen && (
         <div
           ref={spaceModalRef}
           className="sheet"
-          style={{ padding: 16, transform: `translateY(${modalTranslate}px)` }}
+          style={{ 
+            padding: 16, 
+            transform: `translateY(${modalTranslate}px)`,
+            zIndex: 1000,
+            animation: spaceModalJustOpened ? 'slideUp 0.3s ease-out' : 'none'
+          }}
         >
           <div
             className="sheet-handle"
@@ -452,15 +522,30 @@ export default function Booking() {
               {availableSpacesByType.length === 0 ? (
                 <div style={{ padding: 16, color: '#64748b' }}>Không còn không gian trống trong khoảng thời gian đã chọn.</div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(3, 1fr)', 
+                  gap: 12, 
+                  marginTop: 16,
+                  padding: '0 4px'
+                }}>
                   {availableSpacesByType.map(s => (
                     <button
                       key={s.space_id}
                       className="btn secondary"
-                      style={{ aspectRatio: '1 / 1', padding: 8 }}
+                      style={{ 
+                        aspectRatio: '1 / 1', 
+                        padding: 0,
+                        minHeight: 0,
+                        minWidth: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '12px'
+                      }}
                       onClick={() => handleChooseSpace(s.space_id)}
                     >
-                      <div style={{ fontWeight: 700 }}>{s.space_id}</div>
+                      <div style={{ fontWeight: 600, fontSize: 12 }}>{s.space_id}</div>
                     </button>
                   ))}
                 </div>
@@ -470,6 +555,27 @@ export default function Booking() {
           <button className="btn full" style={{ marginTop: 12 }} onClick={() => setSpaceModalOpen(false)}>Đóng</button>
         </div>
       )}
+
+      <style>{`
+        @keyframes slideUp {
+          from {
+            transform: translateY(20px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+      `}</style>
     </MobileLayout>
   )
 }
